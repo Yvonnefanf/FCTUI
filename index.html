@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCT</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #fff;
+        }
+        h2 {
+            text-align: center;
+            color: #222;
+            letter-spacing: 1px;
+            margin-bottom: 32px;
+        }
+        .container {
+            display: flex;
+            gap: 32px;
+            justify-content: center;
+        }
+        table {
+            border-collapse: collapse;
+            width: 340px;
+            background: #fff;
+            border: 1px solid #bdbdbd;
+            box-shadow: none;
+            border-radius: 0;
+            overflow: hidden;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #bdbdbd;
+            padding: 8px 14px;
+            text-align: left;
+            font-size: 15px;
+            height: 40px;
+            line-height: 40px;
+            background: #fff;
+            vertical-align: middle;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        th {
+            background: #f3f6fa;
+            color: #222;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        tr {
+            transition: background 0.15s;
+            height: 40px;
+            overflow: hidden;
+        }
+        tbody tr:hover {
+            background: #eaf2fb;
+        }
+        .droppable {
+            background: #e0ffe0 !important;
+            box-shadow: none;
+        }
+        .draggable {
+            cursor: grab;
+            user-select: none;
+        }
+        .draggable:active {
+            cursor: grabbing;
+        }
+        h3 {
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+        .delete-x {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #f3f3f3;
+            color: #888;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            margin-right: 4px;
+        }
+        .delete-x:hover {
+            background: #e57373;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <h2>Two Table Drag and Drop Interface</h2>
+    <div class="container">
+        <div>
+            <h3>Data Table</h3>
+            <table id="left-table">
+                <thead>
+                    <tr><th style="width:36px;"></th><th>ID</th><th>Name</th></tr>
+                </thead>
+                <tbody>
+                    <!-- Data rows will be rendered here -->
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <h3>Example Pools</h3>
+            <table id="right-table">
+                <thead>
+                    <tr><th style="width:36px;"></th><th>ID</th><th>Name</th></tr>
+                </thead>
+                <tbody>
+                    <!-- Example pool rows will be rendered here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        // Initial data
+        let leftData = [
+            { id: 1, name: 'Alice' },
+            { id: 2, name: 'Bob' }
+        ];
+        let rightData = [
+            { id: 3, name: 'Charlie' },
+            { id: 4, name: 'Diana' },
+            { id: 5, name: 'Eve' }
+        ];
+        // pool 原始 id
+        const poolIds = rightData.map(row => row.id);
+
+        function renderTables() {
+            // Render left table
+            const leftTbody = document.querySelector('#left-table tbody');
+            leftTbody.innerHTML = '';
+            leftData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td><button class="delete-x" data-index="${idx}" title="删除">×</button></td><td>${row.id}</td><td>${row.name}</td>`;
+                leftTbody.appendChild(tr);
+            });
+
+            // Render right table
+            const rightTbody = document.querySelector('#right-table tbody');
+            rightTbody.innerHTML = '';
+            rightData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.classList.add('draggable');
+                tr.setAttribute('draggable', 'true');
+                tr.setAttribute('data-index', idx);
+                tr.innerHTML = `<td></td><td>${row.id}</td><td>${row.name}</td>`;
+                rightTbody.appendChild(tr);
+            });
+        }
+
+        // Drag and drop logic
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTables();
+
+            // Delegate dragstart for right table
+            document.querySelector('#right-table tbody').addEventListener('dragstart', function(e) {
+                if (e.target && e.target.nodeName === 'TR') {
+                    e.dataTransfer.setData('text/plain', e.target.getAttribute('data-index'));
+                }
+            });
+
+            // Left table as drop target
+            const leftTable = document.querySelector('#left-table tbody');
+            leftTable.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                leftTable.classList.add('droppable');
+            });
+            leftTable.addEventListener('dragleave', function(e) {
+                leftTable.classList.remove('droppable');
+            });
+            leftTable.addEventListener('drop', function(e) {
+                e.preventDefault();
+                leftTable.classList.remove('droppable');
+                const idx = e.dataTransfer.getData('text/plain');
+                if (idx !== null && rightData[idx]) {
+                    // Add to left table
+                    leftData.push(rightData[idx]);
+                    // Remove from right table
+                    rightData.splice(idx, 1);
+                    renderTables();
+                }
+            });
+
+            // 删除按钮事件（事件委托）
+            document.querySelector('#left-table tbody').addEventListener('click', function(e) {
+                if (e.target && e.target.classList.contains('delete-x')) {
+                    const idx = e.target.getAttribute('data-index');
+                    const row = leftData[idx];
+                    // 如果是 pool 里的数据，回到右侧
+                    if (poolIds.includes(row.id)) {
+                        rightData.push(row);
+                    }
+                    leftData.splice(idx, 1);
+                    renderTables();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
