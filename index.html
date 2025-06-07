@@ -36,13 +36,14 @@
             padding: 8px 14px;
             text-align: left;
             font-size: 15px;
-            height: 40px;
-            line-height: 40px;
+            height: 30px;
+            line-height: 30px;
             background: #fff;
             vertical-align: middle;
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
+            width: 50px;
         }
         th {
             background: #f3f6fa;
@@ -65,9 +66,26 @@
         .draggable {
             cursor: grab;
             user-select: none;
+            transition: background 0.15s;
         }
         .draggable:active {
             cursor: grabbing;
+        }
+        .draggable:hover {
+            background: #d0eaff;
+        }
+        .draggable.dragging {
+            background: #90caf9 !important;
+        }
+        .drag-handle {
+            display: inline-block;
+            width: 18px;
+            text-align: center;
+            color: #888;
+            font-size: 16px;
+            cursor: grab;
+            margin-right: 2px;
+            user-select: none;
         }
         h3 {
             text-align: center;
@@ -98,10 +116,10 @@
     </style>
 </head>
 <body>
-    <h2>Two Table Drag and Drop Interface</h2>
+    <h2>Example based</h2>
     <div class="container">
         <div>
-            <h3>Data Table</h3>
+            <h3>FCT</h3>
             <table id="left-table">
                 <thead>
                     <tr><th style="width:36px;"></th><th>ID</th><th>Name</th></tr>
@@ -115,7 +133,7 @@
             <h3>Example Pools</h3>
             <table id="right-table">
                 <thead>
-                    <tr><th style="width:36px;"></th><th>ID</th><th>Name</th></tr>
+                    <tr><th style="width:24px;"></th><th>ID</th><th>Name</th></tr>
                 </thead>
                 <tbody>
                     <!-- Example pool rows will be rendered here -->
@@ -125,29 +143,47 @@
     </div>
     <script>
         // Initial data
-        let leftData = [
-            { id: 1, name: 'Alice' },
-            { id: 2, name: 'Bob' }
-        ];
-        let rightData = [
-            { id: 3, name: 'Charlie' },
-            { id: 4, name: 'Diana' },
-            { id: 5, name: 'Eve' }
-        ];
-        // pool 原始 id
-        const poolIds = rightData.map(row => row.id);
+        let leftData = [];
+        let rightData = [];
+        let rightHeaders = [];
+        let poolIds = [];
+        let leftHeaders = [];
+
+        // CSV parsing utility
+        function parseCSV(text, setHeaders) {
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',');
+            if (setHeaders) setHeaders(headers);
+            return lines.slice(1).filter(line => line.trim()).map(line => {
+                const values = line.split(',');
+                const obj = {};
+                headers.forEach((h, i) => {
+                    obj[h] = values[i];
+                });
+                obj.id = values[0];
+                return obj;
+            });
+        }
 
         function renderTables() {
+            // Render left table header
+            const leftThead = document.querySelector('#left-table thead tr');
+            leftThead.innerHTML = '<th style="width:36px;"></th>' + rightHeaders.map(h => `<th>${h}</th>`).join('');
+
             // Render left table
             const leftTbody = document.querySelector('#left-table tbody');
             leftTbody.innerHTML = '';
             leftData.forEach((row, idx) => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td><button class="delete-x" data-index="${idx}" title="删除">×</button></td><td>${row.id}</td><td>${row.name}</td>`;
+                tr.innerHTML = `<td><button class=\"delete-x\" data-index=\"${idx}\" title=\"删除\">×</button></td>` + rightHeaders.map(h => `<td>${row[h] ?? ''}</td>`).join('');
                 leftTbody.appendChild(tr);
             });
 
-            // Render right table
+            // Render right table header
+            const rightThead = document.querySelector('#right-table thead tr');
+            rightThead.innerHTML = `<th style='width:24px;'></th>` + rightHeaders.map(h => `<th>${h}</th>`).join('');
+
+            // Render right table body
             const rightTbody = document.querySelector('#right-table tbody');
             rightTbody.innerHTML = '';
             rightData.forEach((row, idx) => {
@@ -155,19 +191,35 @@
                 tr.classList.add('draggable');
                 tr.setAttribute('draggable', 'true');
                 tr.setAttribute('data-index', idx);
-                tr.innerHTML = `<td></td><td>${row.id}</td><td>${row.name}</td>`;
+                tr.innerHTML = `<td class='drag-handle' title='Drag to FCT'>&#9776;</td>` + rightHeaders.map(h => `<td>${row[h]}</td>`).join('');
                 rightTbody.appendChild(tr);
             });
         }
 
         // Drag and drop logic
         document.addEventListener('DOMContentLoaded', () => {
-            renderTables();
+            // Fetch and parse CSV for leftData and rightData
+            Promise.all([
+                fetch('trace.csv').then(r => r.text()),
+                fetch('examples.csv').then(r => r.text())
+            ]).then(([traceText, examplesText]) => {
+                leftData = parseCSV(traceText, null);
+                rightData = parseCSV(examplesText, headers => { rightHeaders = headers; });
+                poolIds = rightData.map(row => row.id);
+                renderTables();
+            });
 
             // Delegate dragstart for right table
             document.querySelector('#right-table tbody').addEventListener('dragstart', function(e) {
                 if (e.target && e.target.nodeName === 'TR') {
+                    e.target.classList.add('dragging');
                     e.dataTransfer.setData('text/plain', e.target.getAttribute('data-index'));
+                }
+            });
+
+            document.querySelector('#right-table tbody').addEventListener('dragend', function(e) {
+                if (e.target && e.target.nodeName === 'TR') {
+                    e.target.classList.remove('dragging');
                 }
             });
 
